@@ -3,6 +3,7 @@ on:
   push:
     paths-ignore:
       - 'last-build.log'
+      - 'app-debug.apk'
   workflow_dispatch:
 
 permissions:
@@ -27,21 +28,18 @@ jobs:
           set -o pipefail
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon --stacktrace --console=plain 2>&1 | tee build.log
-      - name: publish log
+      - name: publish
         if: always()
         run: |
           cp src/build.log last-build.log 2>/dev/null || echo "no log" > last-build.log
+          if [ -f src/app/build/outputs/apk/debug/app-debug.apk ]; then
+            cp src/app/build/outputs/apk/debug/app-debug.apk app-debug.apk
+            git add app-debug.apk
+          fi
           git config user.name "ci-bot"
           git config user.email "ci-bot@users.noreply.github.com"
           git add last-build.log
-          git commit -m "ci: build log ($(date -u +%H%M%S))" || true
+          git commit -m "ci: build artifacts ($(date -u +%H%M%S))" || true
           git push || true
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: out
-          path: |
-            src/**/outputs/apk/**/*.apk
-            src/build.log
       - if: steps.b.outcome == 'failure'
         run: exit 1
