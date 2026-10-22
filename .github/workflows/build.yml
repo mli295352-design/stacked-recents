@@ -17,7 +17,10 @@ jobs:
         id: b
         continue-on-error: true
         working-directory: src
-        run: gradle assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle assembleDebug --no-daemon --stacktrace --console=plain 2>&1 | tee build.log
       - name: summary
         if: steps.b.outcome == 'failure'
         run: |
@@ -25,12 +28,19 @@ jobs:
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           tail -n 120 src/build.log >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
+      - name: list output
+        if: always()
+        run: |
+          echo '## 产物' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          find src -name '*.apk' -exec ls -lh {} \; >> "$GITHUB_STEP_SUMMARY" 2>&1 || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: out
           path: |
-            src/app/build/outputs/apk/debug/*.apk
+            src/**/outputs/apk/**/*.apk
             src/build.log
       - if: steps.b.outcome == 'failure'
         run: exit 1
