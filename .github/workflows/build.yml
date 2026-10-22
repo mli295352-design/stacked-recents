@@ -1,5 +1,13 @@
 name: build
-on: [push, workflow_dispatch]
+on:
+  push:
+    paths-ignore:
+      - 'last-build.log'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
 jobs:
   apk:
     runs-on: ubuntu-latest
@@ -19,20 +27,15 @@ jobs:
           set -o pipefail
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon --stacktrace --console=plain 2>&1 | tee build.log
-      - name: summary
-        if: steps.b.outcome == 'failure'
-        run: |
-          echo '## 构建失败，最后 150 行日志' >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          tail -n 150 src/build.log >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-      - name: list output
+      - name: publish log
         if: always()
         run: |
-          echo '## 产物' >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          find src -name '*.apk' -exec ls -lh {} \; >> "$GITHUB_STEP_SUMMARY" 2>&1 || true
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cp src/build.log last-build.log 2>/dev/null || echo "no log" > last-build.log
+          git config user.name "ci-bot"
+          git config user.email "ci-bot@users.noreply.github.com"
+          git add last-build.log
+          git commit -m "ci: build log ($(date -u +%H%M%S))" || true
+          git push || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
